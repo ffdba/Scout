@@ -5,7 +5,7 @@
 # 用法: bash setup_tools.sh [--force]
 #   --force: 强制重新下载所有工具，即使已存在
 # ============================================================
-set -euo pipefail
+set -uo pipefail
 
 FORCE_DOWNLOAD=false
 if [[ "${1:-}" == "--force" ]]; then
@@ -21,6 +21,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 GHPROXY="https://ghproxy.net"
+CURL_OPTS="--connect-timeout 15 --max-time 300 -sfL"
 
 info()  { echo -e "${GREEN}[+]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
@@ -52,7 +53,8 @@ should_download() {
         info "${tool_name} 文件存在但无执行权限，将重新下载"
         return 0
     fi
-    local size=$(stat -c%s "$tool_path" 2>/dev/null || stat -f%z "$tool_path" 2>/dev/null || echo "0")
+    local size
+    size=$(stat -c%s "$tool_path" 2>/dev/null || stat -f%z "$tool_path" 2>/dev/null || echo "0")
     if [ "$size" -lt 1000 ]; then
         warn "${tool_name} 文件异常 (${size} bytes)，将重新下载"
         return 0
@@ -60,43 +62,54 @@ should_download() {
     return 1
 }
 
-download_github_release() {
+get_latest_download_url() {
     local repo="$1"
     local name_pattern="$2"
-    local output_name="$3"
-
-    if ! should_download "$output_name"; then
-        info "跳过 ${output_name} (已存在且有效)"
-        return 0
-    fi
-
-    local api_url="https://api.github.com/repos/${repo}/releases/latest"
     local download_url=""
 
-    info "获取 ${repo} 最新版本..."
+    local api_url="https://api.github.com/repos/${repo}/releases/latest"
+    local proxy_api_url="${GHPROXY}/${api_url}"
+
+    info "获取 ${repo} 最新版本 (通过代理)..."
     local release_info
-    release_info=$(curl -sfL "$api_url" 2>/dev/null) || true
+    release_info=$(curl $CURL_OPTS "$proxy_api_url" 2>/dev/null) || true
 
     if [ -z "$release_info" ]; then
-        fail "无法获取 ${repo} 的发布信息，请检查网络"
+        warn "代理获取失败，尝试直连 GitHub API..."
+        release_info=$(curl $CURL_OPTS "$api_url" 2>/dev/null) || true
+    fi
+
+    if [ -z "$release_info" ]; then
+        echo ""
         return 1
     fi
 
     download_url=$(echo "$release_info" | grep -oP '"browser_download_url":\s*"\K[^"]*' | grep -i "$name_pattern" | head -1)
 
-    if [ -z "$download_url" ]; then
-        fail "未找到匹配 ${name_pattern} 的下载链接"
-        return 1
-    fi
+    echo "${download_url}"
+}
+
+download_and_install() {
+    local download_url="$1"
+    local output_name="$2"
 
     local proxy_url="${GHPROXY}/${download_url}"
     local tmp_file="/tmp/${output_name}.download"
-    info "下载: ${download_url}"
-    curl -sfL --progress-bar -o "$tmp_file" "$proxy_url"
 
+    info "下载: ${download_url}"
+    info "代理: ${proxy_url}"
+
+    curl $CURL_OPTS --progress-bar -o "$tmp_file" "$proxy_url"
     local curl_exit=$?
+
     if [ $curl_exit -ne 0 ]; then
-        fail "下载失败 (curl exit: ${curl_exit})，代理地址: ${proxy_url}"
+        warn "代理下载失败 (exit: ${curl_exit})，尝试直连..."
+        curl $CURL_OPTS --progress-bar -o "$tmp_file" "$download_url"
+        curl_exit=$?
+    fi
+
+    if [ $curl_exit -ne 0 ]; then
+        fail "下载失败: ${output_name}"
         rm -f "$tmp_file"
         return 1
     fi
@@ -129,23 +142,34 @@ download_github_release() {
     chmod +x "${BIN_DIR}/${output_name}"
     rm -rf "$tmp_dir" "$tmp_file"
 
-    local size=$(stat -c%s "${BIN_DIR}/${output_name}" 2>/dev/null || stat -f%z "${BIN_DIR}/${output_name}" 2>/dev/null)
+    local size
+    size=$(stat -c%s "${BIN_DIR}/${output_name}" 2>/dev/null || stat -f%z "${BIN_DIR}/${output_name}" 2>/dev/null)
     info "已安装: ${BIN_DIR}/${output_name} (${size} bytes)"
 }
 
-download_direct() {
-    local url="$1"
-    local output_name="$2"
+download_github_release() {
+    local repo="$1"
+    local name_pattern="$2"
+    local output_name="$3"
 
     if ! should_download "$output_name"; then
         info "跳过 ${output_name} (已存在且有效)"
         return 0
     fi
 
-    info "下载: ${url}"
-    curl -sfL --progress-bar -o "${BIN_DIR}/${output_name}" "$url"
-    chmod +x "${BIN_DIR}/${output_name}"
-    info "已安装: ${BIN_DIR}/${output_name}"
+    local download_url
+    download_url=$(get_latest_download_url "$repo" "$name_pattern")
+
+    if [ -z "$download_url" ]; then
+        fail "无法获取 ${repo} 的下载链接，跳过 ${output_name}"
+        warn "可手动下载后放到 ${BIN_DIR}/${output_name}"
+        return 0
+    fi
+
+    download_and_install "$download_url" "$output_name" || {
+        warn "${output_name} 安装失败，跳过 (不影响其他工具)"
+        return 0
+    }
 }
 
 echo ""
@@ -167,7 +191,7 @@ download_github_release "projectdiscovery/katana" "linux_${ARCH}" "katana"
 
 # --- RustScan ---
 info "--- RustScan ---"
-download_github_release "RustScan/RustScan" "linux_${ARCH}" "rustscan"
+download_github_release "RustScan/RustScan" "linux" "rustscan"
 
 # --- Feroxbuster ---
 info "--- Feroxbuster ---"
@@ -202,12 +226,12 @@ info "--- SecLists 字典 ---"
 WORDLIST_DIR="$(cd "$(dirname "$0")" && pwd)/wordlists"
 mkdir -p "$WORDLIST_DIR"
 if [ ! -f "${WORDLIST_DIR}/raft-medium-directories.txt" ] || \
-   [ "$(stat -c%s "${WORDLIST_DIR}/raft-medium-directories.txt" 2>/dev/null || stat -f%z "${WORDLIST_DIR}/raft-medium-directories.txt" 2>/dev/null)" -lt 1000 ]; then
+   [ "$(stat -c%s "${WORDLIST_DIR}/raft-medium-directories.txt" 2>/dev/null || stat -f%z "${WORDLIST_DIR}/raft-medium-directories.txt" 2>/dev/null || echo "0")" -lt 1000 ]; then
     info "下载 SecLists Web 字典..."
-    local seclists_url="https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-medium-directories.txt"
-    local proxy_seclists_url="${GHPROXY}/${seclists_url}"
-    curl -sfL --progress-bar -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$proxy_seclists_url" || \
-    curl -sfL --progress-bar -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$seclists_url" || \
+    seclists_url="https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-medium-directories.txt"
+    proxy_seclists_url="${GHPROXY}/${seclists_url}"
+    curl $CURL_OPTS --progress-bar -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$proxy_seclists_url" || \
+    curl $CURL_OPTS --progress-bar -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$seclists_url" || \
     warn "字典下载失败，可手动下载到 wordlists/ 目录"
 else
     info "字典已存在，跳过"
@@ -228,7 +252,7 @@ echo ""
 info "已安装工具:"
 for tool in subfinder nuclei httpx naabu katana rustscan feroxbuster gitleaks; do
     if [ -f "${BIN_DIR}/${tool}" ] && [ -x "${BIN_DIR}/${tool}" ]; then
-        local size=$(stat -c%s "${BIN_DIR}/${tool}" 2>/dev/null || stat -f%z "${BIN_DIR}/${tool}" 2>/dev/null || echo "?")
+        size=$(stat -c%s "${BIN_DIR}/${tool}" 2>/dev/null || stat -f%z "${BIN_DIR}/${tool}" 2>/dev/null || echo "?")
         echo -e "  ${GREEN}✓${NC} ${tool} (${size} bytes)"
     elif command -v "$tool" &>/dev/null; then
         echo -e "  ${GREEN}✓${NC} ${tool} (系统PATH)"
