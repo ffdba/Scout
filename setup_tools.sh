@@ -14,6 +14,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+GHPROXY="https://ghproxy.net"
+
 info()  { echo -e "${GREEN}[+]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 fail()  { echo -e "${RED}[-]${NC} $1"; }
@@ -55,9 +57,11 @@ download_github_release() {
         return 1
     fi
 
+    local proxy_url="${GHPROXY}/${download_url}"
     local tmp_file="/tmp/${output_name}.tar.gz"
     info "下载: ${download_url}"
-    curl -sfL -o "$tmp_file" "$download_url"
+    info "代理: ${proxy_url}"
+    curl -sfL -o "$tmp_file" "$proxy_url"
 
     local tmp_dir="/tmp/${output_name}_extract"
     rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
@@ -102,6 +106,7 @@ download_direct() {
 echo ""
 info "=========================================="
 info "  RedAgent 工具下载 - Linux ${ARCH}"
+info "  使用代理: ${GHPROXY}"
 info "=========================================="
 echo ""
 
@@ -192,8 +197,10 @@ WORDLIST_DIR="$(cd "$(dirname "$0")" && pwd)/wordlists"
 if [ ! -f "${WORDLIST_DIR}/raft-medium-directories.txt" ]; then
     mkdir -p "$WORDLIST_DIR"
     info "下载 SecLists Web 字典..."
-    curl -sfL -o "${WORDLIST_DIR}/raft-medium-directories.txt" \
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-medium-directories.txt" || \
+    local seclists_url="https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-medium-directories.txt"
+    local proxy_seclists_url="${GHPROXY}/${seclists_url}"
+    curl -sfL -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$proxy_seclists_url" || \
+    curl -sfL -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$seclists_url" || \
     warn "字典下载失败，可手动下载到 wordlists/ 目录"
 else
     info "字典已存在，跳过"
