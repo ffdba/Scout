@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core.config import Config
 from core.agent import RedAgent
 from utils.logger import get_logger
+from utils.runner import check_tool_exists, BIN_DIR
 
 logger = get_logger("main")
 
@@ -39,13 +40,15 @@ def check_dependencies():
         "wappalyzer": "技术栈识别",
     }
 
-    import shutil
     for tool, desc in required_tools.items():
-        if not shutil.which(tool):
+        if not check_tool_exists(tool):
             missing.append(f"  [必须] {tool} - {desc}")
     for tool, desc in optional_tools.items():
-        if not shutil.which(tool):
+        if not check_tool_exists(tool):
             logger.info(f"可选工具未安装: {tool} ({desc})")
+
+    if BIN_DIR.exists() and any(BIN_DIR.iterdir()):
+        logger.info(f"bin/ 目录已启用 (工具路径: {BIN_DIR})")
 
     if missing:
         logger.error("以下必须工具未安装:")
