@@ -2,9 +2,15 @@
 # ============================================================
 # RedAgent 一键部署脚本
 # 在 Linux 服务器上运行此脚本完成所有初始化
-# 用法: bash deploy.sh
+# 用法: bash deploy.sh [--force]
+#   --force: 强制重新下载所有工具
 # ============================================================
 set -euo pipefail
+
+FORCE_DOWNLOAD=false
+if [[ "${1:-}" == "--force" ]]; then
+    FORCE_DOWNLOAD=true
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -56,12 +62,11 @@ info "Python 依赖安装完成"
 
 # --- Step 3: 下载安全工具 ---
 step "Step 3/5: 下载安全工具到 bin/"
-if [ -d "bin" ] && [ "$(ls -A bin 2>/dev/null)" ]; then
-    info "bin/ 目录已有工具，跳过下载"
-    info "如需重新下载，请删除 bin/ 目录后重新运行"
-else
-    bash setup_tools.sh
+if [ "$FORCE_DOWNLOAD" = true ]; then
+    info "强制模式: 删除 bin/ 目录后重新下载所有工具"
+    rm -rf bin/
 fi
+bash setup_tools.sh ${FORCE_DOWNLOAD:+--force}
 
 # --- Step 4: 设置权限 ---
 step "Step 4/5: 设置执行权限"
@@ -94,8 +99,9 @@ echo ""
 
 info "工具状态:"
 for tool in subfinder nuclei httpx naabu katana rustscan feroxbuster gitleaks; do
-    if [ -f "bin/${tool}" ]; then
-        echo -e "  ${GREEN}✓${NC} ${tool}"
+    if [ -f "bin/${tool}" ] && [ -x "bin/${tool}" ]; then
+        local size=$(stat -c%s "bin/${tool}" 2>/dev/null || stat -f%z "bin/${tool}" 2>/dev/null || echo "?")
+        echo -e "  ${GREEN}✓${NC} ${tool} (${size} bytes)"
     elif command -v "$tool" &>/dev/null; then
         echo -e "  ${GREEN}✓${NC} ${tool} (系统PATH)"
     else
@@ -105,6 +111,8 @@ done
 
 if command -v nmap &>/dev/null; then
     echo -e "  ${GREEN}✓${NC} nmap (系统PATH)"
+elif [ -f "bin/nmap" ]; then
+    echo -e "  ${GREEN}✓${NC} nmap (bin/)"
 else
     echo -e "  ${YELLOW}✗${NC} nmap (需: sudo apt install nmap)"
 fi
@@ -119,3 +127,6 @@ echo "  python main.py example.com --ai"
 echo ""
 info "指定阶段:"
 echo "  python main.py example.com -s 1,2,3"
+echo ""
+info "强制重新下载所有工具:"
+echo "  bash deploy.sh --force"

@@ -2,9 +2,15 @@
 # ============================================================
 # RedAgent 工具下载脚本
 # 自动下载所有安全工具的 Linux amd64 预编译二进制到 bin/ 目录
-# 用法: bash setup_tools.sh
+# 用法: bash setup_tools.sh [--force]
+#   --force: 强制重新下载所有工具，即使已存在
 # ============================================================
 set -euo pipefail
+
+FORCE_DOWNLOAD=false
+if [[ "${1:-}" == "--force" ]]; then
+    FORCE_DOWNLOAD=true
+fi
 
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)/bin"
 mkdir -p "$BIN_DIR"
@@ -33,10 +39,36 @@ detect_arch() {
 ARCH=$(detect_arch)
 info "检测到架构: $ARCH"
 
+should_download() {
+    local tool_name="$1"
+    if [ "$FORCE_DOWNLOAD" = true ]; then
+        return 0
+    fi
+    local tool_path="${BIN_DIR}/${tool_name}"
+    if [ ! -f "$tool_path" ]; then
+        return 0
+    fi
+    if [ ! -x "$tool_path" ]; then
+        info "${tool_name} 文件存在但无执行权限，将重新下载"
+        return 0
+    fi
+    local size=$(stat -c%s "$tool_path" 2>/dev/null || stat -f%z "$tool_path" 2>/dev/null || echo "0")
+    if [ "$size" -lt 1000 ]; then
+        warn "${tool_name} 文件异常 (${size} bytes)，将重新下载"
+        return 0
+    fi
+    return 1
+}
+
 download_github_release() {
     local repo="$1"
     local name_pattern="$2"
     local output_name="$3"
+
+    if ! should_download "$output_name"; then
+        info "跳过 ${output_name} (已存在且有效)"
+        return 0
+    fi
 
     local api_url="https://api.github.com/repos/${repo}/releases/latest"
     local download_url=""
@@ -46,7 +78,7 @@ download_github_release() {
     release_info=$(curl -sfL "$api_url" 2>/dev/null) || true
 
     if [ -z "$release_info" ]; then
-        fail "无法获取 ${repo} 的发布信息，请检查网络或手动下载"
+        fail "无法获取 ${repo} 的发布信息，请检查网络"
         return 1
     fi
 
@@ -58,10 +90,16 @@ download_github_release() {
     fi
 
     local proxy_url="${GHPROXY}/${download_url}"
-    local tmp_file="/tmp/${output_name}.tar.gz"
+    local tmp_file="/tmp/${output_name}.download"
     info "下载: ${download_url}"
-    info "代理: ${proxy_url}"
-    curl -sfL -o "$tmp_file" "$proxy_url"
+    curl -sfL --progress-bar -o "$tmp_file" "$proxy_url"
+
+    local curl_exit=$?
+    if [ $curl_exit -ne 0 ]; then
+        fail "下载失败 (curl exit: ${curl_exit})，代理地址: ${proxy_url}"
+        rm -f "$tmp_file"
+        return 1
+    fi
 
     local tmp_dir="/tmp/${output_name}_extract"
     rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
@@ -90,15 +128,22 @@ download_github_release() {
     cp "$binary_path" "${BIN_DIR}/${output_name}"
     chmod +x "${BIN_DIR}/${output_name}"
     rm -rf "$tmp_dir" "$tmp_file"
-    info "已安装: ${BIN_DIR}/${output_name}"
+
+    local size=$(stat -c%s "${BIN_DIR}/${output_name}" 2>/dev/null || stat -f%z "${BIN_DIR}/${output_name}" 2>/dev/null)
+    info "已安装: ${BIN_DIR}/${output_name} (${size} bytes)"
 }
 
 download_direct() {
     local url="$1"
     local output_name="$2"
 
+    if ! should_download "$output_name"; then
+        info "跳过 ${output_name} (已存在且有效)"
+        return 0
+    fi
+
     info "下载: ${url}"
-    curl -sfL -o "${BIN_DIR}/${output_name}" "$url"
+    curl -sfL --progress-bar -o "${BIN_DIR}/${output_name}" "$url"
     chmod +x "${BIN_DIR}/${output_name}"
     info "已安装: ${BIN_DIR}/${output_name}"
 }
@@ -107,68 +152,30 @@ echo ""
 info "=========================================="
 info "  RedAgent 工具下载 - Linux ${ARCH}"
 info "  使用代理: ${GHPROXY}"
+info "  强制下载: ${FORCE_DOWNLOAD}"
 info "=========================================="
 echo ""
 
 # --- ProjectDiscovery 工具 ---
 info "--- ProjectDiscovery 工具集 ---"
 
-if [ ! -f "${BIN_DIR}/subfinder" ]; then
-    download_github_release "projectdiscovery/subfinder" "linux_${ARCH}" "subfinder"
-else
-    info "subfinder 已存在，跳过"
-fi
-
-if [ ! -f "${BIN_DIR}/nuclei" ]; then
-    download_github_release "projectdiscovery/nuclei" "linux_${ARCH}" "nuclei"
-else
-    info "nuclei 已存在，跳过"
-fi
-
-if [ ! -f "${BIN_DIR}/httpx" ]; then
-    download_github_release "projectdiscovery/httpx" "linux_${ARCH}" "httpx"
-else
-    info "httpx 已存在，跳过"
-fi
-
-if [ ! -f "${BIN_DIR}/naabu" ]; then
-    download_github_release "projectdiscovery/naabu" "linux_${ARCH}" "naabu"
-else
-    info "naabu 已存在，跳过"
-fi
-
-if [ ! -f "${BIN_DIR}/katana" ]; then
-    download_github_release "projectdiscovery/katana" "linux_${ARCH}" "katana"
-else
-    info "katana 已存在，跳过"
-fi
+download_github_release "projectdiscovery/subfinder" "linux_${ARCH}" "subfinder"
+download_github_release "projectdiscovery/nuclei" "linux_${ARCH}" "nuclei"
+download_github_release "projectdiscovery/httpx" "linux_${ARCH}" "httpx"
+download_github_release "projectdiscovery/naabu" "linux_${ARCH}" "naabu"
+download_github_release "projectdiscovery/katana" "linux_${ARCH}" "katana"
 
 # --- RustScan ---
 info "--- RustScan ---"
-
-if [ ! -f "${BIN_DIR}/rustscan" ]; then
-    download_github_release "RustScan/RustScan" "linux_${ARCH}" "rustscan"
-else
-    info "rustscan 已存在，跳过"
-fi
+download_github_release "RustScan/RustScan" "linux_${ARCH}" "rustscan"
 
 # --- Feroxbuster ---
 info "--- Feroxbuster ---"
-
-if [ ! -f "${BIN_DIR}/feroxbuster" ]; then
-    download_github_release "epi052/feroxbuster" "linux-${ARCH}" "feroxbuster"
-else
-    info "feroxbuster 已存在，跳过"
-fi
+download_github_release "epi052/feroxbuster" "linux-${ARCH}" "feroxbuster"
 
 # --- Gitleaks ---
 info "--- Gitleaks ---"
-
-if [ ! -f "${BIN_DIR}/gitleaks" ]; then
-    download_github_release "gitleaks/gitleaks" "linux_${ARCH}" "gitleaks"
-else
-    info "gitleaks 已存在，跳过"
-fi
+download_github_release "gitleaks/gitleaks" "linux_${ARCH}" "gitleaks"
 
 # --- Nmap (通过 apt 安装) ---
 info "--- Nmap ---"
@@ -178,7 +185,6 @@ elif [ -f "${BIN_DIR}/nmap" ]; then
     info "nmap 已存在于 bin/"
 else
     warn "nmap 需要通过系统包管理器安装: sudo apt install -y nmap"
-    warn "或手动下载静态编译版本到 bin/nmap"
 fi
 
 # --- Wappalyzer CLI ---
@@ -194,13 +200,14 @@ fi
 # --- 下载 SecLists 字典 (Feroxbuster 依赖) ---
 info "--- SecLists 字典 ---"
 WORDLIST_DIR="$(cd "$(dirname "$0")" && pwd)/wordlists"
-if [ ! -f "${WORDLIST_DIR}/raft-medium-directories.txt" ]; then
-    mkdir -p "$WORDLIST_DIR"
+mkdir -p "$WORDLIST_DIR"
+if [ ! -f "${WORDLIST_DIR}/raft-medium-directories.txt" ] || \
+   [ "$(stat -c%s "${WORDLIST_DIR}/raft-medium-directories.txt" 2>/dev/null || stat -f%z "${WORDLIST_DIR}/raft-medium-directories.txt" 2>/dev/null)" -lt 1000 ]; then
     info "下载 SecLists Web 字典..."
     local seclists_url="https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-medium-directories.txt"
     local proxy_seclists_url="${GHPROXY}/${seclists_url}"
-    curl -sfL -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$proxy_seclists_url" || \
-    curl -sfL -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$seclists_url" || \
+    curl -sfL --progress-bar -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$proxy_seclists_url" || \
+    curl -sfL --progress-bar -o "${WORDLIST_DIR}/raft-medium-directories.txt" "$seclists_url" || \
     warn "字典下载失败，可手动下载到 wordlists/ 目录"
 else
     info "字典已存在，跳过"
@@ -209,7 +216,7 @@ fi
 # --- Nuclei 模板初始化 ---
 info "--- Nuclei 模板 ---"
 if [ -f "${BIN_DIR}/nuclei" ]; then
-    info "更新 Nuclei 模板..."
+    info "更新 Nuclei 模板 (需要较长时间)..."
     "${BIN_DIR}/nuclei" -update-templates 2>/dev/null || warn "模板更新失败，首次运行时会自动下载"
 fi
 
@@ -219,11 +226,17 @@ info "  工具下载完成！"
 info "=========================================="
 echo ""
 info "已安装工具:"
-ls -lh "${BIN_DIR}/" 2>/dev/null | tail -n +2 | while read line; do
-    echo "  $line"
+for tool in subfinder nuclei httpx naabu katana rustscan feroxbuster gitleaks; do
+    if [ -f "${BIN_DIR}/${tool}" ] && [ -x "${BIN_DIR}/${tool}" ]; then
+        local size=$(stat -c%s "${BIN_DIR}/${tool}" 2>/dev/null || stat -f%z "${BIN_DIR}/${tool}" 2>/dev/null || echo "?")
+        echo -e "  ${GREEN}✓${NC} ${tool} (${size} bytes)"
+    elif command -v "$tool" &>/dev/null; then
+        echo -e "  ${GREEN}✓${NC} ${tool} (系统PATH)"
+    else
+        echo -e "  ${YELLOW}✗${NC} ${tool}"
+    fi
 done
 echo ""
 info "使用方法:"
-info "  1. 上传整个项目到 Linux 服务器"
-info "  2. 运行: bash deploy.sh"
-info "  3. 开始: python3 main.py example.com"
+info "  1. 运行: bash deploy.sh"
+info "  2. 开始: python3 main.py example.com"
