@@ -1,0 +1,104 @@
+# ============================================================
+# RedAgent 配置文件
+# 复制此文件为 config.yaml 并填入你的真实密钥
+# ============================================================
+
+# --- AI 模型配置 ---
+ai:
+  provider: "openai"                          # openai | azure | deepseek | custom
+  api_key: ""                                 # 你的 AI API Key
+  base_url: "https://api.openai.com/v1"       # 可替换为 Azure/DeepSeek 等端点
+  model: "gpt-4o"                             # 模型名称
+  temperature: 0.2                            # 推理温度，越低越确定
+  max_tokens: 4096
+
+# --- 360 Quake API ---
+quake:
+  api_key: ""                                 # 360 Quake API Key
+  # 获取地址: https://quake.360.net/quake/#/personal?tab=service
+
+# --- Hunter (奇安信) API ---
+hunter:
+  api_key: ""                                 # Hunter API Key
+  # 获取地址: https://hunter.qianxin.com/
+
+# --- crt.sh ---
+crtsh:
+  timeout: 30                                 # 请求超时(秒)
+
+# --- Gitleaks ---
+gitleaks:
+  repo_path: ""                               # 可选: 指定要扫描的 Git 仓库路径
+
+# --- Subfinder ---
+subfinder:
+  config_path: ""                             # 可选: Subfinder provider 配置文件路径
+  timeout: 300                                # 超时(秒)
+  threads: 10                                 # 并发线程数
+
+# --- RustScan / Naabu ---
+portscan:
+  engine: "rustscan"                          # rustscan | naabu
+  rustscan:
+    timeout: 300                              # 超时(秒)
+    batch_size: 512                           # 批量扫描端口数
+    ulimit: 5000                              # 文件描述符限制
+  naabu:
+    timeout: 300
+    rate: 1000                                # 发包速率
+    top_ports: 1000                           # 扫描 Top N 端口
+
+# --- Nmap ---
+nmap:
+  timeout: 600                                # 超时(秒)
+  service_detection: true                     # 启用服务版本检测
+  os_detection: false                         # 启用 OS 检测(需 root)
+  scripts: "default,vuln"                     # NSE 脚本
+
+# --- Httpx ---
+httpx:
+  timeout: 30
+  threads: 25
+  follow_redirects: true
+  status_codes: true
+  tech_detect: true
+
+# --- Wappalyzer ---
+wappalyzer:
+  timeout: 30
+
+# --- Katana ---
+katana:
+  timeout: 300
+  depth: 3                                    # 爬取深度
+  threads: 10
+  js_crawl: true                              # 启用 JS 爬取
+  autofill: true                              # 自动填充表单
+
+# --- Feroxbuster ---
+feroxbuster:
+  timeout: 300
+  threads: 50
+  wordlist: "/usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt"
+  status_codes: "200,204,301,302,307,401,403"
+  extensions: "php,asp,aspx,jsp,html,js,bak,old,zip,tar.gz,sql,conf,env,yml,yaml,json,xml"
+
+# --- Nuclei ---
+nuclei:
+  timeout: 600
+  templates: ""                               # 可选: 指定模板路径
+  severity: "low,medium,high,critical"        # 漏洞严重级别过滤
+  tags: ""                                    # 可选: 按标签过滤模板
+  rate_limit: 150                             # 请求速率限制
+
+# --- 输出配置 ---
+output:
+  dir: "./output"                             # 输出目录
+  format: "jsonl"                             # jsonl | json | csv
+  verbose: true                               # 详细日志
+
+# --- 代理配置 ---
+proxy:
+  enabled: false
+  http: ""                                    # http://127.0.0.1:7890
+  https: ""                                   # https://127.0.0.1:7890
