@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from core.config import Config
-from core.models import PipelineContext, StageResult, Subdomain, PortInfo
+from core.models import PipelineContext, StageResult
 from core.stage import BaseStage
 from tools.subfinder import SubfinderTool
 from tools.portscan import RustScanTool, NaabuTool
@@ -28,14 +28,20 @@ class Stage2Boundary(BaseStage):
 
         self.think_step(f"Subfinder 主动枚举子域: {ctx.target}")
         new_subs = await self.subfinder.enumerate(ctx.target)
-        result.subdomains.extend(new_subs)
-        self.think_step(f"Subfinder 发现 {len(new_subs)} 个新子域")
+        existing_domains = {s.domain for s in ctx.all_subdomains if s.domain}
+        unique_new_subs = []
+        seen_new = set()
+        for sub in new_subs:
+            if not sub.domain or sub.domain in existing_domains or sub.domain in seen_new:
+                continue
+            unique_new_subs.append(sub)
+            seen_new.add(sub.domain)
 
-        ctx.merge(StageResult(stage_name="temp", stage_index=0, subdomains=new_subs))
-        ctx.deduplicate_subdomains()
-        self.think_step(f"去重后共 {len(ctx.all_subdomains)} 个唯一子域")
+        result.subdomains.extend(unique_new_subs)
+        self.think_step(f"Subfinder 发现 {len(unique_new_subs)} 个新子域")
 
-        alive_hosts = list({s.domain for s in ctx.all_subdomains if s.domain})
+        alive_hosts = list(existing_domains | {s.domain for s in unique_new_subs if s.domain})
+        self.think_step(f"去重后共 {len(alive_hosts)} 个唯一子域")
         self.logger.info(f"待扫描端口的主机数: {len(alive_hosts)}")
 
         if alive_hosts:

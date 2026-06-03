@@ -20,6 +20,7 @@ class PortInfo:
     port: int
     protocol: str = "tcp"
     service: str = ""
+    product: str = ""
     version: str = ""
     banner: str = ""
 
@@ -95,7 +96,8 @@ class StageResult:
                 for s in self.subdomains
             ],
             "ports": [
-                {"ip": p.ip, "port": p.port, "protocol": p.protocol, "service": p.service, "version": p.version}
+                {"ip": p.ip, "port": p.port, "protocol": p.protocol, "service": p.service,
+                 "product": p.product, "version": p.version}
                 for p in self.ports
             ],
             "fingerprints": [
@@ -133,6 +135,8 @@ class PipelineContext:
     all_sensitive_paths: list[SensitivePath] = field(default_factory=list)
     all_vulnerabilities: list[Vulnerability] = field(default_factory=list)
     all_credential_leaks: list[CredentialLeak] = field(default_factory=list)
+    agent_decisions: list[dict[str, Any]] = field(default_factory=list)
+    ai_analysis: str = ""
 
     def merge(self, result: StageResult):
         self.results.append(result)
@@ -165,13 +169,16 @@ class PipelineContext:
                 "total_credential_leaks": len(self.all_credential_leaks),
                 "vulnerability_by_severity": self._severity_summary(),
             },
+            "agent_decisions": self.agent_decisions,
+            "ai_analysis": self.ai_analysis,
             "stages": [r.to_dict() for r in self.results],
             "subdomains": [
                 {"domain": s.domain, "source": s.source, "ip_list": s.ip_list, "is_alive": s.is_alive}
                 for s in self.all_subdomains
             ],
             "ports": [
-                {"ip": p.ip, "port": p.port, "protocol": p.protocol, "service": p.service, "version": p.version}
+                {"ip": p.ip, "port": p.port, "protocol": p.protocol, "service": p.service,
+                 "product": p.product, "version": p.version}
                 for p in self.all_ports
             ],
             "fingerprints": [

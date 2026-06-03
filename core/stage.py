@@ -30,10 +30,16 @@ class BaseStage(ABC):
             return thought
 
         try:
+            import httpx
             from openai import AsyncOpenAI
             base_url = self.config.get("ai", "base_url", default="https://api.openai.com/v1")
             model = self.config.get("ai", "model", default="gpt-4o")
-            client = AsyncOpenAI(api_key=ai_key, base_url=base_url)
+            think_timeout = self.config.get("ai", "think_timeout", default=8)
+            client = AsyncOpenAI(
+                api_key=ai_key,
+                base_url=base_url,
+                timeout=httpx.Timeout(think_timeout, connect=5.0),
+            )
             resp = await client.chat.completions.create(
                 model=model,
                 messages=[

@@ -144,6 +144,61 @@ RedAgent 在每个阶段执行前会输出 **🧠 Agent 思考过程**，让你�
 
 ---
 
+## Agentic 决策模式
+
+RedAgent 现在支持受控的 **agentic loop**：不再只是固定跑完五个阶段后总结，而是在每个阶段结束后执行一次“观察-决策-行动”循环。
+
+### 工作方式
+
+1. **Observe**：读取当前阶段产出的子域名、端口、指纹、敏感路径、漏洞和错误信息。
+2. **Decide**：AI 根据当前报告生成结构化决策，包括是否继续、是否跳过低价值阶段、优先目标、风险假设和人工验证建议。
+3. **Act**：RedAgent 只会在内置的 1-5 阶段范围内继续、停止或跳过阶段，不会让 AI 任意执行系统命令。
+4. **Report**：最终报告会保存每轮 `agent_decisions`，并额外生成 AI 总结分析。
+
+### 运行方式
+
+只要配置了 `AI_API_KEY` 或 `config/config.yaml` 中的 `ai.api_key`，默认启用 agentic 决策：
+
+```bash
+python main.py example.com
+```
+
+强制使用传统线性流水线：
+
+```bash
+python main.py example.com --linear
+```
+
+完全禁用 AI：
+
+```bash
+python main.py example.com --no-ai
+```
+
+### 输出文件
+
+```text
+output/example_com_report.json        # 结构化扫描报告，包含 agent_decisions 和 ai_analysis
+output/example_com_ai_analysis.md     # AI 生成的 Markdown 渗透思路与风险分析
+```
+
+> Agentic 模式是受控自主：AI 负责规划和分析，工具执行仍限制在授权范围内的固定安全测试阶段中。
+
+---
+
+## 更新说明
+
+### Agentic 模式更新
+
+- 新增阶段后 AI 决策层：每个阶段执行后，AI 会基于当前报告判断是否继续、停止或跳过后续低价值阶段。
+- 最终报告新增 `agent_decisions` 和 `ai_analysis` 字段。
+- 扫描完成后会额外输出 `*_ai_analysis.md`，用于保存 AI 生成的渗透思路、风险分析和下一轮测试建议。
+- 新增 `--linear` 用于回到传统固定流水线，新增 `--no-ai` 用于禁用 AI。
+- 修复 Stage2 直接写入临时 `temp` 阶段导致报告重复的问题。
+- 修复 Nmap 服务识别结果中的 `product` 字段无法写入 `PortInfo` 的问题。
+
+---
+
 ## API 密钥配置详解
 
 ### AI 模型配置

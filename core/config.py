@@ -5,7 +5,14 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+    _DOTENV_AVAILABLE = True
+except ImportError:
+    def load_dotenv(*args, **kwargs):
+        pass
+    _DOTENV_AVAILABLE = False
 
 _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "config.yaml"
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"

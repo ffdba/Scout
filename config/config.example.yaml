@@ -11,6 +11,11 @@ ai:
   model: "gpt-4o"                             # 模型名称
   temperature: 0.2                            # 推理温度，越低越确定
   max_tokens: 4096
+  think_timeout: 8                            # Agent 思考超时(秒)，超时回退到规则推理
+
+# --- Agent 决策配置 ---
+agent:
+  max_steps: 8                                # agentic 模式最多执行阶段数，防止循环失控
 
 # --- 360 Quake API ---
 quake:

@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -21,6 +23,16 @@ BANNER = r"""
   ╩╚═┴ ┴ └┘ └─┘┘└┘  ╝╚╝└─┘┴ └─└─┘└─┘
   Red Team Automated Penetration Agent v1.0
 """
+
+
+def normalize_target(raw: str) -> str:
+    raw = raw.strip().strip("`'\"")
+    if "://" in raw:
+        parsed = urlparse(raw)
+        raw = parsed.hostname or raw
+    raw = raw.rstrip("/")
+    raw = re.sub(r"^www\.", "", raw)
+    return raw.lower()
 
 
 def check_dependencies():
@@ -65,6 +77,8 @@ async def main():
     parser.add_argument("-c", "--config", default=None, help="配置文件路径 (默认: config/config.yaml)")
     parser.add_argument("-s", "--stages", default=None, help="指定执行阶段，逗号分隔，如 1,2,3 (默认: 全部)")
     parser.add_argument("--ai", action="store_true", help="启用 AI 分析 (需配置 AI API Key)")
+    parser.add_argument("--no-ai", action="store_true", help="禁用扫描后的 AI 报告分析")
+    parser.add_argument("--linear", action="store_true", help="使用固定线性流水线，不启用 agentic 决策")
     parser.add_argument("--skip-check", action="store_true", help="跳过依赖检查")
     parser.add_argument("--list-stages", action="store_true", help="列出所有阶段")
 
@@ -86,24 +100,39 @@ async def main():
         if not check_dependencies():
             sys.exit(1)
 
+    target = normalize_target(args.target)
+    if target != args.target:
+        logger.info(f"目标已标准化: {args.target} -> {target}")
+
     stages = None
     if args.stages:
         stages = [s.strip() for s in args.stages.split(",")]
 
-    logger.info(f"目标: {args.target}")
+    logger.info(f"目标: {target}")
     logger.info(f"阶段: {stages or '全部(1-5)'}")
-    logger.info(f"AI 分析: {'启用' if args.ai else '禁用'}")
+    ai_key_set = bool(config.get("ai", "api_key"))
+    enable_ai = (args.ai or ai_key_set) and not args.no_ai
+    enable_agentic = enable_ai and not args.linear
+    logger.info(f"AI 分析: {'启用' if enable_ai else '禁用'}")
+    logger.info(f"Agentic 决策: {'启用' if enable_agentic else '禁用'}")
 
-    if args.ai:
-        ctx = await agent.run_with_ai(args.target, stages=stages)
+    if enable_agentic:
+        ctx = await agent.run_agentic(target, stages=stages)
+    elif enable_ai:
+        ctx = await agent.run_with_ai(target, stages=stages)
     else:
-        ctx = await agent.run(args.target, stages=stages)
+        ctx = await agent.run(target, stages=stages)
 
     output_dir = config.get("output", "dir", default="./output")
-    target_safe = args.target.replace(".", "_").replace("/", "_")
+    target_safe = target.replace(".", "_").replace("/", "_")
     report_path = Path(output_dir) / f"{target_safe}_report.json"
     ctx.save_json(str(report_path))
     logger.info(f"完整报告已保存: {report_path}")
+
+    if ctx.ai_analysis:
+        analysis_path = Path(output_dir) / f"{target_safe}_ai_analysis.md"
+        analysis_path.write_text(ctx.ai_analysis, encoding="utf-8")
+        logger.info(f"AI 分析已保存: {analysis_path}")
 
 
 if __name__ == "__main__":
