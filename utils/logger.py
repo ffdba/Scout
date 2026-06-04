@@ -7,7 +7,7 @@ from pathlib import Path
 _logger_cache: dict[str, logging.Logger] = {}
 
 
-def get_logger(name: str = "redagent", level: int = logging.INFO) -> logging.Logger:
+def get_logger(name: str = "scout", level: int = logging.INFO) -> logging.Logger:
     if name in _logger_cache:
         return _logger_cache[name]
 
@@ -28,7 +28,7 @@ def get_logger(name: str = "redagent", level: int = logging.INFO) -> logging.Log
 
         log_dir = Path("./output/logs")
         log_dir.mkdir(parents=True, exist_ok=True)
-        fh = logging.FileHandler(log_dir / "redagent.log", encoding="utf-8")
+        fh = logging.FileHandler(log_dir / "scout.log", encoding="utf-8")
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(fmt)
         logger.addHandler(fh)

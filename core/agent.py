@@ -17,7 +17,7 @@ from utils.logger import get_logger
 logger = get_logger("agent")
 
 
-class RedAgent:
+class ScoutAgent:
     STAGE_MAP: dict[str, type[BaseStage]] = {
         "1": Stage1OSINT,
         "2": Stage2Boundary,
@@ -180,7 +180,7 @@ class RedAgent:
             observation_json = observation_json[:30000] + "\n...<observation truncated>..."
 
         return (
-            "你是 RedAgent 的决策层。你只能在用户授权范围内做安全测试规划，"
+            "你是 Scout 的决策层。你只能在用户授权范围内做安全测试规划，"
             "不能建议破坏性利用、持久化、绕过检测、数据窃取或越权行动。\n\n"
             "请根据观察结果输出一个 JSON 对象，不要输出 Markdown。字段：\n"
             "{\n"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# RedAgent 工具下载脚本
+# Scout 工具下载脚本
 # 自动下载所有安全工具的 Linux amd64 预编译二进制到 bin/ 目录
 # 用法: bash setup_tools.sh [--force]
 #   --force: 强制重新下载所有工具，即使已存在
@@ -174,7 +174,7 @@ download_github_release() {
 
 echo ""
 info "=========================================="
-info "  RedAgent 工具下载 - Linux ${ARCH}"
+info "  Scout 工具下载 - Linux ${ARCH}"
 info "  使用代理: ${GHPROXY}"
 info "  强制下载: ${FORCE_DOWNLOAD}"
 info "=========================================="

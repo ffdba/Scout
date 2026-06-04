@@ -1,4 +1,4 @@
-# RedAgent - 红队自动化渗透 Agent
+# Scout - 红队自动化渗透 Agent
 
 > 五阶段流水线式红队自动化侦察与漏洞验证框架
 
@@ -43,11 +43,11 @@ graph TD
 
 ```bash
 # 1. 上传整个项目到服务器
-scp -r red/ user@server:/opt/red/
+scp -r Scout/ user@server:/opt/scout/
 
 # 2. SSH 登录服务器
 ssh user@server
-cd /opt/red
+cd /opt/scout
 
 # 3. 一键部署（安装依赖 + 下载工具 + 配置环境）
 bash deploy.sh
@@ -81,10 +81,10 @@ python main.py example.com
 
 ## 开箱即用设计
 
-RedAgent 采用 **`bin/` 目录优先** 的工具查找策略，所有安全工具的预编译二进制都存放在 `bin/` 目录中：
+Scout 采用 **`bin/` 目录优先** 的工具查找策略，所有安全工具的预编译二进制都存放在 `bin/` 目录中：
 
 ```
-red/
+Scout/
 ├── bin/                  # 工具二进制（setup_tools.sh 自动下载）
 │   ├── subfinder
 │   ├── nuclei
@@ -112,7 +112,7 @@ red/
 
 ## Agent 思考输出
 
-RedAgent 在每个阶段执行前会输出 **🧠 Agent 思考过程**，让你实时了解 Agent 的推理逻辑：
+Scout 在每个阶段执行前会输出 **🧠 Agent 思考过程**，让你实时了解 Agent 的推理逻辑：
 
 ### 思考模式
 
@@ -146,13 +146,13 @@ RedAgent 在每个阶段执行前会输出 **🧠 Agent 思考过程**，让你�
 
 ## Agentic 决策模式
 
-RedAgent 现在支持受控的 **agentic loop**：不再只是固定跑完五个阶段后总结，而是在每个阶段结束后执行一次“观察-决策-行动”循环。
+Scout 现在支持受控的 **agentic loop**：不再只是固定跑完五个阶段后总结，而是在每个阶段结束后执行一次“观察-决策-行动”循环。
 
 ### 工作方式
 
 1. **Observe**：读取当前阶段产出的子域名、端口、指纹、敏感路径、漏洞和错误信息。
 2. **Decide**：AI 根据当前报告生成结构化决策，包括是否继续、是否跳过低价值阶段、优先目标、风险假设和人工验证建议。
-3. **Act**：RedAgent 只会在内置的 1-5 阶段范围内继续、停止或跳过阶段，不会让 AI 任意执行系统命令。
+3. **Act**：Scout 只会在内置的 1-5 阶段范围内继续、停止或跳过阶段，不会让 AI 任意执行系统命令。
 4. **Report**：最终报告会保存每轮 `agent_decisions`，并额外生成 AI 总结分析。
 
 ### 运行方式
@@ -203,7 +203,7 @@ output/example_com_ai_analysis.md     # AI 生成的 Markdown 渗透思路与风
 
 ### AI 模型配置
 
-RedAgent 支持通过 AI 对渗透结果进行智能分析，输出风险评级和攻击路径建议。同时 AI 也用于每阶段的思考推理。
+Scout 支持通过 AI 对渗透结果进行智能分析，输出风险评级和攻击路径建议。同时 AI 也用于每阶段的思考推理。
 
 **OpenAI（默认）**
 
@@ -386,7 +386,7 @@ proxy:
 ## 项目结构
 
 ```
-red/
+Scout/
 ├── main.py                    # 入口文件
 ├── requirements.txt           # Python 依赖
 ├── setup_tools.sh             # 工具下载脚本

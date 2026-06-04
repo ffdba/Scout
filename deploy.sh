@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# RedAgent 一键部署脚本
+# Scout 一键部署脚本
 # 在 Linux 服务器上运行此脚本完成所有初始化
 # 用法: bash deploy.sh [--force]
 #   --force: 强制重新下载所有工具
@@ -30,7 +30,7 @@ echo ""
 echo -e "${CYAN}╦═╗┌─┐┬  ┬┌─┐┌┐┌  ╔╗╔┌─┐─┐ ┬┬ ┬┌─┐${NC}"
 echo -e "${CYAN}╠╦╝├─┤└┐┌┘├┤ │││  ║║║├┤ ┌┴┬┘│ │└─┐${NC}"
 echo -e "${CYAN}╩╚═┴ ┴ └┘ └─┘┘└┘  ╝╚╝└─┘┴ └─└─┘└─┘${NC}"
-echo -e "${CYAN}  RedAgent 一键部署${NC}"
+echo -e "${CYAN}  Scout 一键部署${NC}"
 echo ""
 
 # --- Step 1: 系统依赖 ---

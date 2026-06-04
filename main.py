@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core.config import Config
-from core.agent import RedAgent
+from core.agent import ScoutAgent
 from utils.logger import get_logger
 from utils.runner import check_tool_exists, BIN_DIR
 
@@ -21,7 +21,7 @@ BANNER = r"""
   ╦═╗┌─┐┬  ┬┌─┐┌┐┌  ╔╗╔┌─┐─┐ ┬┬ ┬┌─┐
   ╠╦╝├─┤└┐┌┘├┤ │││  ║║║├┤ ┌┴┬┘│ │└─┐
   ╩╚═┴ ┴ └┘ └─┘┘└┘  ╝╚╝└─┘┴ └─└─┘└─┘
-  Red Team Automated Penetration Agent v1.0
+  Scout Automated Penetration Agent v1.0
 """
 
 
@@ -72,7 +72,7 @@ def check_dependencies():
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="RedAgent - 红队自动化渗透 Agent")
+    parser = argparse.ArgumentParser(description="Scout - 红队自动化渗透 Agent")
     parser.add_argument("target", help="目标根域名，如 example.com")
     parser.add_argument("-c", "--config", default=None, help="配置文件路径 (默认: config/config.yaml)")
     parser.add_argument("-s", "--stages", default=None, help="指定执行阶段，逗号分隔，如 1,2,3 (默认: 全部)")
@@ -88,11 +88,11 @@ async def main():
 
     config = Config(args.config)
 
-    agent = RedAgent(config)
+    agent = ScoutAgent(config)
 
     if args.list_stages:
         print("可用阶段:")
-        for key, cls in RedAgent.STAGE_MAP.items():
+        for key, cls in ScoutAgent.STAGE_MAP.items():
             print(f"  {key}: {cls.name if hasattr(cls, 'name') else cls.__name__}")
         return
 
