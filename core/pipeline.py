@@ -22,7 +22,7 @@ class Pipeline:
         self.stages.append(stage)
         return self
 
-    async def execute(self, target: str) -> PipelineContext:
+    async def execute(self, target: str, *, persist: bool = True) -> PipelineContext:
         self.ctx = PipelineContext(target=target)
         logger.info(f"开始对目标 {target} 执行 {len(self.stages)} 个阶段")
 
@@ -41,23 +41,13 @@ class Pipeline:
                 )
                 self.ctx.merge(err_result)
 
-        self._save_output()
+        if persist:
+            self._save_output()
         return self.ctx
 
     def _save_output(self):
         output_dir = self.config.get("output", "dir", default="./output")
         fmt = self.config.get("output", "format", default="jsonl")
-
-        from pathlib import Path
-        out_path = Path(output_dir)
-        out_path.mkdir(parents=True, exist_ok=True)
-
-        target_safe = self.ctx.target.replace(".", "_").replace("/", "_")
-        if fmt == "jsonl":
-            file_path = out_path / f"{target_safe}_report.jsonl"
-            self.ctx.save_jsonl(str(file_path))
-        else:
-            file_path = out_path / f"{target_safe}_report.json"
-            self.ctx.save_json(str(file_path))
-
-        logger.info(f"报告已保存: {file_path}")
+        from core.reporting import write_report
+        paths = write_report(self.ctx.to_final_report(), output_dir, fmt=fmt)
+        logger.info(f"报告已保存: {paths['json']}")

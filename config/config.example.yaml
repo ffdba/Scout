@@ -99,7 +99,7 @@ nuclei:
 # --- 输出配置 ---
 output:
   dir: "./output"                             # 输出目录
-  format: "jsonl"                             # jsonl | json | csv
+  format: "jsonl"                             # jsonl | json（同时导出 Markdown 评估报告）
   verbose: true                               # 详细日志
 
 # --- 代理配置 ---

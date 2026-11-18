@@ -1,9 +1,41 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from copy import deepcopy
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from typing import Any
+
+from core.intelligence import SEVERITY_SCORES, build_intelligence, observation_key
+
+
+COLLECTIONS = ("subdomains", "ports", "fingerprints", "sensitive_paths",
+               "vulnerabilities", "credential_leaks")
+
+
+def _merge_records(collection: str, rows: list) -> list:
+    merged: dict[tuple, Any] = {}
+    for row in rows:
+        key = observation_key(collection, asdict(row))
+        if key not in merged:
+            merged[key] = deepcopy(row)
+            continue
+        existing = merged[key]
+        for attr in fields(row):
+            value = getattr(row, attr.name)
+            previous = getattr(existing, attr.name)
+            if isinstance(value, list):
+                previous.extend(deepcopy(item) for item in value if item not in previous)
+            elif attr.name == "source":
+                existing.source = ",".join(dict.fromkeys(
+                    name for name in f"{previous},{value}".split(",") if name
+                ))
+            elif attr.name == "severity":
+                if SEVERITY_SCORES.get(value.lower(), 0) > SEVERITY_SCORES.get(previous.lower(), 0):
+                    existing.severity = value
+            elif value:
+                setattr(existing, attr.name, value)
+    return list(merged.values())
 
 
 @dataclass
@@ -87,42 +119,18 @@ class StageResult:
             self.timestamp = datetime.now().isoformat()
 
     def to_dict(self) -> dict:
-        return {
-            "stage_name": self.stage_name,
-            "stage_index": self.stage_index,
-            "timestamp": self.timestamp,
-            "subdomains": [
-                {"domain": s.domain, "source": s.source, "ip_list": s.ip_list, "is_alive": s.is_alive}
-                for s in self.subdomains
-            ],
-            "ports": [
-                {"ip": p.ip, "port": p.port, "protocol": p.protocol, "service": p.service,
-                 "product": p.product, "version": p.version}
-                for p in self.ports
-            ],
-            "fingerprints": [
-                {"url": f.url, "technologies": f.technologies, "os": f.os, "server": f.server,
-                 "status_code": f.status_code, "title": f.title}
-                for f in self.fingerprints
-            ],
-            "sensitive_paths": [
-                {"url": s.url, "status_code": s.status_code, "content_length": s.content_length,
-                 "path_type": s.path_type}
-                for s in self.sensitive_paths
-            ],
-            "vulnerabilities": [
-                {"template_id": v.template_id, "name": v.name, "severity": v.severity,
-                 "url": v.url, "matched_at": v.matched_at, "type": v.type, "description": v.description}
-                for v in self.vulnerabilities
-            ],
-            "credential_leaks": [
-                {"source": c.source, "repo": c.repo, "file": c.file, "rule": c.rule,
-                 "secret_type": c.secret_type}
-                for c in self.credential_leaks
-            ],
-            "raw_data": self.raw_data,
-            "errors": self.errors,
-        }
+        result = asdict(self)
+        # Preserve useful metadata without publishing captured secrets or response bodies.
+        for collection, omitted in {
+            "credential_leaks": ("match",),
+            "vulnerabilities": ("extraction",),
+            "sensitive_paths": ("response_snippet",),
+            "ports": ("banner",),
+        }.items():
+            for row in result[collection]:
+                for key in omitted:
+                    row.pop(key, None)
+        return result
 
 
 @dataclass
@@ -140,24 +148,19 @@ class PipelineContext:
 
     def merge(self, result: StageResult):
         self.results.append(result)
-        self.all_subdomains.extend(result.subdomains)
-        self.all_ports.extend(result.ports)
-        self.all_fingerprints.extend(result.fingerprints)
-        self.all_sensitive_paths.extend(result.sensitive_paths)
-        self.all_vulnerabilities.extend(result.vulnerabilities)
-        self.all_credential_leaks.extend(result.credential_leaks)
+        for collection in COLLECTIONS:
+            name = f"all_{collection}"
+            setattr(self, name, _merge_records(
+                collection, getattr(self, name) + getattr(result, collection)
+            ))
 
     def deduplicate_subdomains(self):
-        seen: set[str] = set()
-        unique: list[Subdomain] = []
-        for s in self.all_subdomains:
-            if s.domain not in seen:
-                seen.add(s.domain)
-                unique.append(s)
-        self.all_subdomains = unique
+        self.all_subdomains = _merge_records("subdomains", self.all_subdomains)
 
     def to_final_report(self) -> dict:
-        return {
+        snapshot = StageResult(**{name: getattr(self, f"all_{name}") for name in COLLECTIONS}).to_dict()
+        report = {
+            "schema_version": "2.0",
             "target": self.target,
             "generated_at": datetime.now().isoformat(),
             "summary": {
@@ -170,38 +173,17 @@ class PipelineContext:
                 "vulnerability_by_severity": self._severity_summary(),
             },
             "agent_decisions": self.agent_decisions,
+            "agent_thoughts": [
+                {"stage": result.stage_index, **thought}
+                for result in self.results
+                for thought in result.raw_data.get("agent_thoughts", [])
+            ],
             "ai_analysis": self.ai_analysis,
             "stages": [r.to_dict() for r in self.results],
-            "subdomains": [
-                {"domain": s.domain, "source": s.source, "ip_list": s.ip_list, "is_alive": s.is_alive}
-                for s in self.all_subdomains
-            ],
-            "ports": [
-                {"ip": p.ip, "port": p.port, "protocol": p.protocol, "service": p.service,
-                 "product": p.product, "version": p.version}
-                for p in self.all_ports
-            ],
-            "fingerprints": [
-                {"url": f.url, "technologies": f.technologies, "os": f.os, "server": f.server,
-                 "status_code": f.status_code, "title": f.title}
-                for f in self.all_fingerprints
-            ],
-            "sensitive_paths": [
-                {"url": s.url, "status_code": s.status_code, "content_length": s.content_length,
-                 "path_type": s.path_type}
-                for s in self.all_sensitive_paths
-            ],
-            "vulnerabilities": [
-                {"template_id": v.template_id, "name": v.name, "severity": v.severity,
-                 "url": v.url, "matched_at": v.matched_at, "type": v.type, "description": v.description}
-                for v in self.all_vulnerabilities
-            ],
-            "credential_leaks": [
-                {"source": c.source, "repo": c.repo, "file": c.file, "rule": c.rule,
-                 "secret_type": c.secret_type}
-                for c in self.all_credential_leaks
-            ],
+            **{name: snapshot[name] for name in COLLECTIONS},
         }
+        report["intelligence"] = build_intelligence(report)
+        return report
 
     def _severity_summary(self) -> dict[str, int]:
         counts: dict[str, int] = {}

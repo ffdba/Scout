@@ -19,17 +19,8 @@ _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Config:
-    _instance: Config | None = None
-    _data: dict[str, Any] = {}
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> Config:
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def __init__(self, config_path: str | None = None):
-        if self._data:
-            return
+        self._data: dict[str, Any] = {}
         self._load(config_path)
 
     def _load(self, config_path: str | None = None):

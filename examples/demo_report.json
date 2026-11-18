@@ -1,0 +1,79 @@
+{
+  "target": "example.test",
+  "generated_at": "2026-11-18T10:00:00+08:00",
+  "demo": true,
+  "summary": {
+    "total_subdomains": 3,
+    "total_open_ports": 2,
+    "total_fingerprints": 2,
+    "total_sensitive_paths": 2,
+    "total_vulnerabilities": 2,
+    "total_credential_leaks": 0
+  },
+  "subdomains": [
+    {"domain": "app.example.test", "source": "crt.sh", "ip_list": ["192.0.2.10"], "is_alive": true},
+    {"domain": "docs.example.test", "source": "subfinder", "ip_list": ["192.0.2.10"], "is_alive": true},
+    {"domain": "api.example.test", "source": "subfinder", "ip_list": [], "is_alive": true}
+  ],
+  "ports": [
+    {"ip": "192.0.2.10", "port": 443, "protocol": "tcp", "service": "https", "product": "nginx", "version": ""},
+    {"ip": "192.0.2.10", "port": 6379, "protocol": "tcp", "service": "redis", "product": "Redis", "version": ""}
+  ],
+  "fingerprints": [
+    {"url": "https://app.example.test", "status_code": 200, "title": "Demo App", "technologies": [{"name": "nginx", "version": ""}]},
+    {"url": "https://docs.example.test", "status_code": 200, "title": "Demo Docs", "technologies": [{"name": "Static Site", "version": ""}]}
+  ],
+  "sensitive_paths": [
+    {"url": "https://app.example.test/config.yml", "status_code": 200, "content_length": 1200, "path_type": "config"},
+    {"url": "https://app.example.test/backup.zip", "status_code": 403, "content_length": 200, "path_type": "backup"}
+  ],
+  "vulnerabilities": [
+    {"template_id": "demo-header-policy", "name": "Demo Header Policy Match", "severity": "high", "url": "https://app.example.test", "matched_at": "https://app.example.test/", "type": "http", "reference": []},
+    {"template_id": "demo-api-metadata", "name": "Demo API Metadata Match", "severity": "medium", "url": "https://api.example.test", "matched_at": "https://api.example.test/metadata", "type": "http", "reference": []}
+  ],
+  "credential_leaks": [],
+  "agent_decisions": [],
+  "stages": [
+    {
+      "stage_index": 1, "stage_name": "OSINT", "errors": [],
+      "subdomains": [{"domain": "app.example.test", "source": "crt.sh", "ip_list": ["192.0.2.10"], "is_alive": false}]
+    },
+    {
+      "stage_index": 2, "stage_name": "Boundary", "errors": [],
+      "subdomains": [
+        {"domain": "docs.example.test", "source": "subfinder", "ip_list": ["192.0.2.10"], "is_alive": true},
+        {"domain": "api.example.test", "source": "subfinder", "ip_list": [], "is_alive": true}
+      ],
+      "ports": [
+        {"ip": "192.0.2.10", "port": 443, "protocol": "tcp", "service": ""},
+        {"ip": "192.0.2.10", "port": 6379, "protocol": "tcp", "service": ""}
+      ]
+    },
+    {
+      "stage_index": 3, "stage_name": "Fingerprint", "errors": [],
+      "ports": [
+        {"ip": "192.0.2.10", "port": 443, "protocol": "tcp", "service": "https", "product": "nginx", "version": ""},
+        {"ip": "192.0.2.10", "port": 6379, "protocol": "tcp", "service": "redis", "product": "Redis", "version": ""}
+      ],
+      "fingerprints": [
+        {"url": "https://app.example.test", "status_code": 200, "technologies": [{"name": "nginx", "version": ""}]},
+        {"url": "https://docs.example.test", "status_code": 200, "technologies": [{"name": "Static Site", "version": ""}]}
+      ]
+    },
+    {
+      "stage_index": 4, "stage_name": "Content",
+      "errors": ["Synthetic timeout on one content probe; coverage is incomplete."],
+      "sensitive_paths": [
+        {"url": "https://app.example.test/config.yml", "status_code": 200, "content_length": 1200, "path_type": "config"},
+        {"url": "https://app.example.test/backup.zip", "status_code": 403, "content_length": 200, "path_type": "backup"}
+      ]
+    },
+    {
+      "stage_index": 5, "stage_name": "Validation", "errors": [],
+      "vulnerabilities": [
+        {"template_id": "demo-header-policy", "name": "Demo Header Policy Match", "severity": "high", "url": "https://app.example.test", "matched_at": "https://app.example.test/", "type": "http", "reference": []},
+        {"template_id": "demo-api-metadata", "name": "Demo API Metadata Match", "severity": "medium", "url": "https://api.example.test", "matched_at": "https://api.example.test/metadata", "type": "http", "reference": []}
+      ]
+    }
+  ]
+}

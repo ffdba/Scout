@@ -1,0 +1,26 @@
+{
+  "target": "example.test",
+  "generated_at": "2026-11-17T10:00:00+08:00",
+  "demo": true,
+  "subdomains": [
+    {"domain": "app.example.test", "source": "crt.sh", "ip_list": ["192.0.2.10"]},
+    {"domain": "legacy.example.test", "source": "crt.sh", "ip_list": []}
+  ],
+  "ports": [{"ip": "192.0.2.10", "port": 443, "protocol": "tcp", "service": "https", "product": "nginx"}],
+  "fingerprints": [
+    {"url": "https://app.example.test", "technologies": [{"name": "nginx", "version": ""}], "status_code": 200}
+  ],
+  "sensitive_paths": [],
+  "vulnerabilities": [
+    {"template_id": "demo-header-policy", "name": "Demo Header Policy Match", "severity": "medium", "url": "https://app.example.test", "matched_at": "https://app.example.test/", "type": "http"},
+    {"template_id": "demo-legacy-match", "name": "Demo Legacy Match", "severity": "low", "url": "https://legacy.example.test", "matched_at": "https://legacy.example.test/", "type": "http"}
+  ],
+  "credential_leaks": [],
+  "stages": [
+    {"stage_index": 1, "stage_name": "OSINT", "errors": []},
+    {"stage_index": 2, "stage_name": "Boundary", "errors": []},
+    {"stage_index": 3, "stage_name": "Fingerprint", "errors": []},
+    {"stage_index": 4, "stage_name": "Content", "errors": []},
+    {"stage_index": 5, "stage_name": "Validation", "errors": []}
+  ]
+}
